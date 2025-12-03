@@ -26,22 +26,15 @@ def parse(input: str) -> list[list[int]]:
 
 
 def find_max_with(bank: list[int], size: int):
-    if size == 0:
-        return None
-
-    max = (-1, 0)
+    if size == 0 or len(bank) == 0:
+        return ""
 
     # print("search: ", bank[0 : len(bank) - size + 1])
+    n_max = max(bank)
+    i_max = bank.index(n_max)
 
-    for i in range(0, len(bank) - size + 1):
-        if max[1] < bank[i]:
-            max = (i, bank[i])
-
-    if size > 1:
-        next = find_max_with(bank[max[0] + 1 :], size - 1)
-        return int(str(max[1]) + str(next))
-    else:
-        return max[1]
+    next = find_max_with(bank[i_max + 1 :], size - 1)
+    return str(n_max) + next
 
 
 def part_1(input: str):
@@ -49,7 +42,7 @@ def part_1(input: str):
     total = 0
 
     for bank in banks:
-        total += find_max_with(bank, 2)
+        total += int(find_max_with(bank, 2))
 
     return total
 
@@ -59,7 +52,7 @@ def part_2(input: str):
     total = 0
 
     for bank in banks:
-        total += find_max_with(bank, 12)
+        total += int(find_max_with(bank, 12))
 
     return total
 
