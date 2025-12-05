@@ -37,15 +37,7 @@ def in_ranges(id, ranges):
     return False
 
 
-def part_1(input: str):
-    ranges, ids = parse(input)
-    total = 0
-
-    return sum([int(in_ranges(id, ranges)) for id in ids])
-
-
-def part_2(input: str):
-    ranges, _ = parse(input)
+def unique_ranges(ranges):
     ranges.sort(key=lambda r: r[0])
 
     uniq_ranges = []
@@ -60,7 +52,20 @@ def part_2(input: str):
 
     uniq_ranges.append(curr)
 
-    return sum([end - start + 1 for start, end in uniq_ranges])
+    return uniq_ranges
+
+
+def part_1(input: str):
+    ranges, ids = parse(input)
+    u_ranges = unique_ranges(ranges)
+    total = 0
+
+    return sum([int(in_ranges(id, u_ranges)) for id in ids])
+
+
+def part_2(input: str):
+    ranges, _ = parse(input)
+    return sum([end - start + 1 for start, end in unique_ranges(ranges)])
 
 
 if __name__ == "__main__":
