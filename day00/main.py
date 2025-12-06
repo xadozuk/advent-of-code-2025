@@ -3,7 +3,7 @@ import time
 
 def main():
     with open("day00/input.txt") as f:
-        input = f.read().strip()
+        input = f.read()
 
     start = time.time_ns()
     print(
