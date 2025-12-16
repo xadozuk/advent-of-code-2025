@@ -6,7 +6,7 @@ EXAMPLE = """\
 """
 
 
-class Day01Test(unittest.TestCase):
+class Test(unittest.TestCase):
     def test_part1_example(self):
         self.assertEqual(None, part_1(EXAMPLE))
 

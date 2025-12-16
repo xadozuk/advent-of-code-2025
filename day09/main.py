@@ -1,6 +1,8 @@
 from collections import deque
-from itertools import combinations
+from itertools import combinations, pairwise
+import math
 import time
+from colorama import Fore
 
 
 def main():
@@ -23,91 +25,125 @@ def parse(input: str):
 
 
 def area(a, b):
-    return abs(a[0] - b[0] + 1) * abs(a[1] - b[1] + 1)
+    return (abs(a[0] - b[0]) + 1) * (abs(a[1] - b[1]) + 1)
 
 
 def distance(a, b):
     return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
 
-def find_neighboors(start, points):
-    possible_neighboors = [
-        (p, distance(start, p))
-        for p in points
-        if start != p and (p[0] == start[0] or p[1] == start[1])
+def compress_coords(points, func):
+    coords = set([func(p) for p in points])
+    # Add border so we have empty space around the polygon
+    coords.update([-math.inf, math.inf])
+
+    sorted_coords = sorted(list(coords))
+
+    # Return a mapping of original coord -> compressed coords
+    return dict([(value, i) for i, value in enumerate(sorted_coords)])
+
+
+IN = 1
+OUT = 2
+
+
+def floodfill(compressed, width, height):
+    grid = {}
+
+    # Fill the grid with the known edges
+    for a, b in pairwise(compressed + [compressed[0]]):
+        (ax, ay), (bx, by) = minmax((a, b))
+        for x in range(ax, bx + 1):
+            for y in range(ay, by + 1):
+                grid[(x, y)] = IN
+
+    # Start outside and fill everything possible (not already IN or OUT)
+    todo = deque([(0, 0)])
+
+    while todo:
+        (x, y) = todo.popleft()
+
+        if x < 0 or x >= width + 1 or y < 0 or y >= height + 1:
+            continue
+
+        if (x, y) not in grid:
+            grid[(x, y)] = OUT
+
+            todo.extendleft([(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)])
+
+    return grid
+
+
+def is_valid_compressed_rect(rect, grid):
+    ((ax, ay), (bx, by)) = minmax(rect)
+
+    for x in range(ax, bx + 1):
+        for y in range(ay, by + 1):
+            if grid.get((x, y), IN) == OUT:
+                # print(rect, area((ax, ay), (bx, by)), "cause", (x, y), False)
+                return False
+
+    # print(rect, area((ax, ay), (bx, by)), True)
+    return True
+
+
+def origin_coords(coords, compressed_x: dict[int, int], compressed_y: dict[int, int]):
+    cx_values = list(compressed_x.values())
+    cx_keys = list(compressed_x.keys())
+    cy_values = list(compressed_y.values())
+    cy_keys = list(compressed_y.keys())
+
+    return [
+        (cx_keys[cx_values.index(x)], cy_keys[cy_values.index(y)]) for x, y in coords
     ]
 
-    selected_neighboors = sorted(possible_neighboors, key=lambda n: n[1])[:2]
 
-    return map(lambda n: n[0], selected_neighboors)
+def is_in_rect(point, rect):
+    x, y = point
+    (ax, ay), (bx, by) = rect
 
+    l, r = min(ax, bx), max(ax, bx)
+    b, t = min(ay, by), max(ay, by)
 
-def segments(points):
-    s = set()
-
-    for p in points:
-        for n in find_neighboors(p, points):
-            if (n[0] == p[0] or n[1] == p[1]) and not (n, p) in s:
-                s.add((p, n))
-
-    return list(s)
+    return l <= x <= r and b <= y <= t
 
 
-def intersect(rectangle, segment):
-    # print(rectangle, segment)
-    (ca_x, ca_y), (cb_x, cb_y) = rectangle
-    (sa_x, sa_y), (sb_x, sb_y) = sorted(segment)
+def minmax(rect):
+    (ax, ay), (bx, by) = rect
 
-    ca_x, cb_x = min(ca_x, cb_x), max(ca_x, cb_x)
-    ca_y, cb_y = min(ca_y, cb_y), max(ca_y, cb_y)
-
-    # One of the segment edge inside the rectangle
-    if (
-        sa_x > ca_x
-        and sa_x < cb_x
-        and sa_y > ca_y
-        and sa_y < cb_y
-        or sb_x > ca_x
-        and sb_x < cb_x
-        and sb_y > ca_y
-        and sb_y < cb_y
-    ):
-        # print("Hit1")
-        return True
-
-    # One of the segment traversing the rectangle
-    if (
-        sa_x == sb_x
-        and sa_x > ca_x
-        and sa_x < cb_x
-        and (sa_y >= ca_y and sa_y <= cb_y or sb_y >= ca_y and sb_y <= cb_y)
-        or sa_y == sb_y
-        and sa_y > ca_y
-        and sa_y < cb_y
-        and (sa_y >= ca_y and sa_y <= cb_y or sb_y >= ca_y and sb_y <= cb_y)
-    ):
-        # print("Hit2")
-        return True
-
-    return False
+    return (min(ax, bx), min(ay, by)), (max(ax, bx), max(ay, by))
 
 
-def print_grid(rect, all_segments, size):
-    grid = [[None] * size[1] for i in range(size[0])]
+def compress_rect(rect, compressed_x, compressed_y):
+    return (
+        (compressed_x[rect[0][0]], compressed_y[rect[0][1]]),
+        (compressed_x[rect[1][0]], compressed_y[rect[1][1]]),
+    )
 
-    ((rax, ray), (rbx, rby)) = rect
-    for x in range(min(rax, rbx), max(rax, rbx) + 1):
-        for y in range(min(ray, rby), max(ray, rby) + 1):
-            grid[x][y] = "-"
 
-    for s in all_segments:
-        for e in s:
-            grid[e[0]][e[1]] = "#"
+def print_grid(points, rect=None, grid=None):
+    # Add empty border around
+    width = max([p[0] for p in points]) + 2
+    height = max([p[1] for p in points]) + 2
 
     print("")
-    for y in range(len(grid[0])):
-        for x in range(len(grid)):
-            print(grid[x][y] or ".", end="")
+    for y in range(height):
+        for x in range(width):
+            color = ""
+
+            if grid:
+                if grid.get((x, y), IN) == OUT:
+                    color = Fore.RED
+                else:
+                    color = Fore.GREEN
+
+            if (x, y) in points:
+                print(color + "#", sep="", end="")
+            elif rect and is_in_rect((x, y), rect):
+                print(color + "-", sep="", end="")
+            else:
+                print(color + ".", sep="", end="")
+            print(Fore.RESET, end="", sep="")
         print("")
 
 
@@ -123,28 +159,25 @@ def part_1(input: str):
 
 def part_2(input: str):
     points = parse(input)
+
+    compressed_x = compress_coords(points, lambda p: p[0])
+    compressed_y = compress_coords(points, lambda p: p[1])
+    compressed = [(compressed_x[x], compressed_y[y]) for x, y in points]
+
+    floodfilled_grid = floodfill(compressed, len(compressed_x), len(compressed_y))
+
+    # print_grid(points)
+    # print_grid(compressed, None, floodfilled_grid)
+
     rectangles = sorted(
-        [(area(a, b), (a, b)) for (a, b) in combinations(points, 2)],
-        key=lambda r: r[0],
-        reverse=True,
+        [(area(a, b), (a, b)) for (a, b) in combinations(points, 2)], reverse=True
     )
 
-    width = max(map(lambda p: p[0], points)) + 3
-    height = max(map(lambda p: p[1], points)) + 2
-
-    all_segments = segments(points)
-
-    # print(all_segments)
-
     for a, r in rectangles:
-        ok = True
-        # print_grid(r, all_segments, (width, height))
-        for segment in all_segments:
-            if intersect(r, segment):
-                ok = False
-                break
+        c_r = compress_rect(r, compressed_x, compressed_y)
+        # print(a, r, c_r)
 
-        if ok:
+        if is_valid_compressed_rect(c_r, floodfilled_grid):
             return a
 
     return None
