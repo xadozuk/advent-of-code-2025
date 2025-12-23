@@ -1,4 +1,5 @@
 from collections import deque
+from z3 import *
 
 
 class Machine:
@@ -77,13 +78,13 @@ class MachineP2:
         for b in buttons_str:
             buttons.append([int(v) for v in b[1:-1].split(",")])
 
-        voltage = tuple([int(v) for v in voltages_str[1:-1].split(",")])
+        voltage = [int(v) for v in voltages_str[1:-1].split(",")]
 
         return MachineP2(buttons, voltage)
 
     def __init__(self, buttons, voltage):
         self.buttons: list[list[int]] = buttons
-        self.voltage: tuple[int] = voltage
+        self.voltage: list[int] = voltage
 
     def __str__(self):
         return f"{{voltage={self.voltage}, buttons={self.buttons}}}"
@@ -91,56 +92,33 @@ class MachineP2:
     def __repr__(self):
         return str(self)
 
-    def is_zero(self, voltage):
-        return all([v == 0 for v in voltage])
-
-    def apply(self, voltage, button):
-        new_voltage = list(voltage)
-
-        for idx in button:
-            new_voltage[idx] -= 1
-
-        if all([v >= 0 for v in new_voltage]):
-            return tuple(new_voltage)
-        else:
-            return None
-
     def solve(self):
-        # print("-> Solve", self.voltage)
+        s = Optimize()
 
-        queue = deque()
-        cache = {}
-        solutions = []
-        min_steps = None
+        button_vars = [Int(f"b{i}") for i in range(len(self.buttons))]
+        s.add(*[b >= 0 for b in button_vars])
 
-        queue.append((self.voltage, 0))
+        for i, v in enumerate(self.voltage):
+            equation = sum(
+                [
+                    button_vars[btn_idx]
+                    for (btn_idx, btn) in enumerate(self.buttons)
+                    if i in btn
+                ]
+            )
 
-        while queue:
-            (voltage, steps) = queue.pop()
+            s.add(simplify(equation == v))
 
-            print(len(queue))
-            print(voltage, steps)
+        n_button_presses = sum(button_vars)
+        s.minimize(n_button_presses)
 
-            if self.is_zero(voltage):
-                print("!", "Found a good config", steps)
-                solutions.append(steps)
-                min_steps = min(solutions)
+        if s.check() == sat:
+            model = s.model()
+            return sum([model[btn_var].as_long() for btn_var in button_vars])
+        else:
+            print("No solution found")
+            return -1
 
-            if (
-                min_steps
-                and steps >= min_steps
-                or voltage in cache
-                and steps >= cache[voltage]
-            ):
-                print("<", "Worse branch")
-                continue
-
-            cache[voltage] = steps
-
-            for b in sorted(self.buttons, key=lambda b: len(b)):
-                new_voltage = self.apply(voltage, b)
-                if new_voltage:
-                    print(">", voltage, b, new_voltage)
-                    queue.append((new_voltage, steps + 1))
-
-        return min(solutions)
+        # print(s)
+        # print(s.check())
+        # print(s.model())

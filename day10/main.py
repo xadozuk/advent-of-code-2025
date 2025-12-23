@@ -38,11 +38,8 @@ def part_1(input: str):
 def part_2(input: str):
     machines = parse(input, MachineP2)
 
-    print(machines)
-
     total = 0
     for i, m in enumerate(machines):
-        print(f"[{i}/{len(machines)}]")
         total += m.solve()
 
     return total
